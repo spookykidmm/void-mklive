@@ -17,6 +17,6 @@
 #xfce-mcs-manager &
 
 compton -b &
-nm-applet &
+connman-gtk --tray &
 ~/.fehbg &
 lxpanel &

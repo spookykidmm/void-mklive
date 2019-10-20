@@ -203,4 +203,4 @@ sh spookybar/spookybar &
 compton -b &
 ~/.fehbg &
 sleep 4;stalonetray -t -i 18&
-sleep 5;nm-applet &
+sleep 5;connman-gtk --tray &
