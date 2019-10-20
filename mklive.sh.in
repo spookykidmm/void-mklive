@@ -144,7 +144,9 @@ install_packages() {
     fi
     # Cleanup and remove useless stuff.
     rm -rf "$ROOTFS"/var/cache/* "$ROOTFS"/run/* "$ROOTFS"/var/run/*
-    cp -r /home/spookykidmm/etc/skel/.config /home/spookykidmm/etc/skel/.fehbg /home/spookykidmm/etc/skel/Zen_decking.png /home/spookykidmm/etc/skel/spookybar "$ROOTFS"/etc/skel/
+
+    # Copy etc/skel
+    cp -r ~/void-mklive/etc/skel/.config ~/void-mklive/etc/skel/.fehbg ~/void-mklive/etc/skel/Zen_decking.png ~/void-mklive/etc/skel/spookybar "$ROOTFS"/etc/skel/
 }
 
 copy_include_directory() {
