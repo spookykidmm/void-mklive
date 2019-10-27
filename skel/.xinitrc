@@ -49,9 +49,9 @@ if [ -d /etc/X11/xinit/xinitrc.d ] ; then
 fi
 
 if [[ -e /usr/bin/herbstluftwm ]]
-then herbstluftwm &
+then herbstluftwm 
 elif [[ -e /usr/bin/i3 ]]
-then i3 &
+then i3 
 elif [[ -e /usr/bin/openbox-session ]]
-then openbox-session &
+then openbox-session 
 fi

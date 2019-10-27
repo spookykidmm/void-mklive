@@ -146,8 +146,8 @@ install_packages() {
     rm -rf "$ROOTFS"/var/cache/* "$ROOTFS"/run/* "$ROOTFS"/var/run/*
 
     # Copy etc/skel
-    cp -r /home/spookykidmm/etc/skel/.config /home/spookykidmm/etc/skel/.fehbg /home/spookykidmm/etc/skel/Zen_decking.png /home/spookykidmm/etc/skel/spookybar "$ROOTFS"/etc/skel/
-    cp -r /home/spookykidmm/void-mklive/nodm.conf "$ROOTFS"/etc/
+    cp -r /home/spookykidmm/void-mklive/skel/.config /home/spookykidmm/void-mklive/skel/.fehbg /home/spookykidmm/void-mklive/skel/Zen_decking.png /home/spookykidmm/void-mklive/skel/spookybar "$ROOTFS"/etc/skel/
+    cp -r /home/spookykidmm/void-mklive/skel/.xinitrc /home/spookykidmm/void-mklive/nodm.conf "$ROOTFS"/etc/
 }
 
 copy_include_directory() {

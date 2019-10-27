@@ -21,7 +21,7 @@ font pango:monospace 8
 
 exec --no-startup-id compton -b
 exec --no-startup-id ~/.fehbg
-exec --no-startup-id connman-gtk --tray
+exec --no-startup-id nm-applet
 
 # Use Mouse+$mod to drag floating windows to their wanted position
 floating_modifier $mod

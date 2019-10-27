@@ -129,7 +129,7 @@ hc rule class=Engrampa fullscreen=on
 # More or less stolen from nxll, as well.
 #hc attr theme.tiling.reset         1
 #hc attr theme.floating.reset       1
-hc pad 0 20 0 0 0
+hc pad 0 0 0 26
 hc set frame_border_active_color    '#b800e6'
 hc set frame_border_normal_color    '#070000'
 hc set frame_bg_normal_color        '#cc3300'
@@ -199,8 +199,4 @@ hc unlock
 hc_run_chain
 
 #autostart
-sh spookybar/spookybar &
-compton -b &
-~/.fehbg &
-sleep 4;stalonetray -t -i 18&
-sleep 5;connman-gtk --tray &
+./startup &
