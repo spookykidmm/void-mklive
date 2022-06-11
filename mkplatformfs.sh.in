@@ -48,10 +48,10 @@ usage() {
     cat <<_EOF
 Usage: $PROGNAME [options] <platform> <base-tarball>
 
-Supported platforms: i686, x86_64, GCP,
-                     dockstar, bananapi, beaglebone, cubieboard2, cubietruck,
-                     odroid-c2, odroid-u2, rpi, rpi2 (armv7), rpi3 (aarch64),
-                     usbarmory, ci20, pogoplugv4
+Supported platforms: i686, x86_64, GCP, bananapi, beaglebone,
+                     cubieboard2, cubietruck, odroid-c2, odroid-u2,
+                     rpi, rpi2 (armv7), rpi3 (aarch64), rpi4 (aarch64), ci20,
+                     pinebookpro, pinephone, rock64
 
 Options
     -b <syspkg> Set an alternative base-system package (defaults to base-system)
@@ -61,6 +61,7 @@ Options
     -C <file>   Full path to the XBPS configuration file
     -r <repo>   Set XBPS repository (may be set multiple times)
     -x <num>    Use <num> threads to compress the image (dynamic if unset)
+    -o <file>   Filename to write the PLATFORMFS archive to
     -n          Do not compress the image, instead print out the rootfs directory
     -h          Show this help
     -V          Show version
@@ -74,15 +75,16 @@ _EOF
 BASEPKG=base-system
 COMPRESSION="y"
 
-while getopts "b:p:k:c:C:r:x:nhV" opt; do
+while getopts "b:p:k:c:C:r:x:o:nhV" opt; do
     case $opt in
         b) BASEPKG="$OPTARG" ;;
         p) EXTRA_PKGS="$OPTARG" ;;
         k) POST_CMD="$OPTARG" ;;
         c) XBPS_CACHEDIR="--cachedir=$OPTARG" ;;
         C) XBPS_CONFFILE="-C $OPTARG" ;;
-        r) XBPS_REPOSITORY="$XBPS_REPOSITORY --repository=$OPTARG" ;;
+        r) XBPS_REPOSITORY="--repository=$OPTARG $XBPS_REPOSITORY" ;;
         x) COMPRESSOR_THREADS="$OPTARG" ;;
+        o) FILENAME="$OPTARG" ;;
         n) COMPRESSION="n" ;;
         h) usage; exit 0 ;;
         V) echo "$PROGNAME @@MKLIVE_VERSION@@"; exit 0 ;;
@@ -113,18 +115,19 @@ case "$PLATFORM" in
     bananapi*) PKGS="$BASEPKG ${PLATFORM%-*}-base" ;;
     beaglebone*) PKGS="$BASEPKG ${PLATFORM%-*}-base" ;;
     cubieboard2*|cubietruck*) PKGS="$BASEPKG ${PLATFORM%-*}-base" ;;
-    dockstar*) PKGS="$BASEPKG ${PLATFORM%-*}-base" ;;
     odroid-u2*) PKGS="$BASEPKG ${PLATFORM%-*}-base" ;;
     odroid-c2*) PKGS="$BASEPKG ${PLATFORM%-musl}-base" ;;
-    rpi3*) PKGS="$BASEPKG rpi-base" ;;
-    rpi2*) PKGS="$BASEPKG rpi-base" ;;
-    rpi*) PKGS="$BASEPKG ${PLATFORM%-*}-base" ;;
-    pogo*) PKGS="$BASEPKG ${PLATFORM%-*}-base" ;;
-    usbarmory*) PKGS="$BASEPKG ${PLATFORM%-*}-base" ;;
+    rpi4*) PKGS="$BASEPKG rpi4-base" ;;
+    rpi3*) PKGS="$BASEPKG rpi3-base" ;;
+    rpi2*) PKGS="$BASEPKG rpi2-base" ;;
+    rpi*) PKGS="$BASEPKG rpi-base" ;;
     ci20*) PKGS="$BASEPKG ${PLATFORM%-*}-base" ;;
     i686*) PKGS="$BASEPKG" ;;
     x86_64*) PKGS="$BASEPKG" ;;
     GCP*) PKGS="$BASEPKG ${PLATFORM%-*}-base" ;;
+    pinebookpro*) PKGS="$BASEPKG ${PLATFORM%-*}-base" ;;
+    pinephone*) PKGS="$BASEPKG ${PLATFORM%-*}-base" ;;
+    rock64*) PKGS="$BASEPKG ${PLATFORM%-*}-base" ;;
     *) die "$PROGNAME: invalid platform!";;
 esac
 
@@ -135,7 +138,7 @@ set_target_arch_from_platform
 set_cachedir
 
 # Append any additional packages if they were requested
-if [ -z "$EXTRA_PKGS" ] ; then
+if [ -n "$EXTRA_PKGS" ] ; then
     PKGS="$PKGS $EXTRA_PKGS"
 fi
 
@@ -157,7 +160,7 @@ tar xf "$BASE_TARBALL" -C "$ROOTFS"
 # $PKGS.  After this step we will do an xbps-reconfigure -f $PKGS
 # under the correct architecture to ensure the system is setup
 # correctly.
-run_cmd_target "xbps-install -S $XBPS_CONFFILE $XBPS_CACHEDIR $XBPS_REPOSITORY -r $ROOTFS -y $PKGS"
+run_cmd_target "xbps-install -SU $XBPS_CONFFILE $XBPS_CACHEDIR $XBPS_REPOSITORY -r $ROOTFS -y $PKGS"
 
 # Now that the packages are installed, we need to chroot in and
 # reconfigure.  This needs to be done as the right architecture.
@@ -222,7 +225,7 @@ fi
 if [ "$COMPRESSION" = "y" ]; then
     # Finally we can compress the tarball, the name will include the
     # platform and the date on which the tarball was built.
-    tarball=void-${PLATFORM}-PLATFORMFS-$(date '+%Y%m%d').tar.xz
+    tarball=${FILENAME:-void-${PLATFORM}-PLATFORMFS-$(date '+%Y%m%d').tar.xz}
     run_cmd "tar -cp --posix --xattrs -C $ROOTFS . | xz -T${COMPRESSOR_THREADS:-0} -9 > $tarball "
 
     # Now that we have the tarball we don't need the rootfs anymore, so we

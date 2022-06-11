@@ -37,7 +37,7 @@ and then see the usage output:
 
 #### Examples
 
-Build a native live image with runit and keyboard set to 'fr':
+Build a native live image keyboard set to 'fr':
 
     # ./mklive.sh -k fr
 
@@ -50,9 +50,3 @@ Build an x86\_64 musl live image with packages stored in a local repository:
     # ./mklive.sh -a x86_64-musl -r /path/to/host/binpkgs
 
 See the usage output for more information :-)
-
-
-These scripts are in flux, if you want to build a duplicate of a
-production image, its not a bad idea to ping maldridge on IRC.  This
-message will be removed when this readme is replaced with complete
-documentation.

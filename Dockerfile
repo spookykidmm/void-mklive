@@ -1,10 +1,10 @@
 # 1) use alpine to generate a void environment
-FROM alpine:3.9 as stage0
+FROM alpine:3.12 as stage0
 ARG REPOSITORY=https://alpha.de.repo.voidlinux.org
 ARG ARCH=x86_64
 COPY keys/* /target/var/db/xbps/keys/
-RUN apk add ca-certificates && \
-  wget -O - ${REPOSITORY}/static/xbps-static-latest.$(uname -m)-musl.tar.xz | \
+RUN apk add ca-certificates curl && \
+  curl ${REPOSITORY}/static/xbps-static-latest.$(uname -m)-musl.tar.xz | \
     tar Jx && \
   XBPS_ARCH=${ARCH} xbps-install.static -yMU \
     --repository=${REPOSITORY}/current \
@@ -32,3 +32,5 @@ FROM scratch
 COPY --from=stage1 /target /
 RUN xbps-reconfigure -a && \
   rm -r /var/cache/xbps
+
+CMD ["/bin/sh"]

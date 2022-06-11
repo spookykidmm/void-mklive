@@ -485,8 +485,15 @@ menu_partitions() {
     if [ $? -eq 0 ]; then
         local device=$(cat $ANSWER)
 
-        DIALOG --title "Modify Partition Table on $device" --msgbox "\n
-${BOLD}cfdisk will be executed in disk $device.${RESET}\n\n
+        DIALOG --title " Select the software for partitioning " \
+            --menu "$MENULABEL" ${MENUSIZE} \
+            "cfdisk" "Easy to use" \
+            "fdisk" "More advanced"
+        if [ $? -eq 0 ]; then
+            local software=$(cat $ANSWER)
+
+            DIALOG --title "Modify Partition Table on $device" --msgbox "\n
+${BOLD}${software} will be executed in disk $device.${RESET}\n\n
 For BIOS systems, MBR or GPT partition tables are supported.\n
 To use GPT on PC BIOS systems an empty partition of 1MB must be added\n
 at the first 2GB of the disk with the TOGGLE \`bios_grub' enabled.\n
@@ -498,13 +505,14 @@ At least 1 partition is required for the rootfs (/).\n
 For swap, RAM*2 must be really enough. For / 600MB are required.\n\n
 ${BOLD}WARNING: /usr is not supported as a separate partition.${RESET}\n
 ${RESET}\n" 18 80
-        if [ $? -eq 0 ]; then
-            while true; do
-                clear; cfdisk $device; PARTITIONS_DONE=1
-                break
-            done
-        else
-            return
+            if [ $? -eq 0 ]; then
+                while true; do
+                    clear; $software $device; PARTITIONS_DONE=1
+                    break
+                done
+            else
+                return
+            fi
         fi
     fi
 }
@@ -619,15 +627,15 @@ set_hostname() {
 }
 
 menu_rootpassword() {
-    local _firstpass _secondpass _desc
+    local _firstpass _secondpass _again _desc
 
     while true; do
         if [ -z "${_firstpass}" ]; then
             _desc="Enter the root password"
         else
-            _desc="$_desc again"
+            _again=" again"
         fi
-        DIALOG --insecure --passwordbox "${_desc}" ${INPUTSIZE}
+        DIALOG --insecure --passwordbox "${_desc}${_again}" ${INPUTSIZE}
         if [ $? -eq 0 ]; then
             if [ -z "${_firstpass}" ]; then
                 _firstpass="$(cat $ANSWER)"
@@ -637,7 +645,7 @@ menu_rootpassword() {
             if [ -n "${_firstpass}" -a -n "${_secondpass}" ]; then
                 if [ "${_firstpass}" != "${_secondpass}" ]; then
                     INFOBOX "Passwords do not match! Please enter again." 6 60
-                    unset _firstpass _secondpass
+                    unset _firstpass _secondpass _again
                     sleep 2 && clear && continue
                 fi
                 set_option ROOTPASSWORD "${_firstpass}"
@@ -655,7 +663,7 @@ set_rootpassword() {
 }
 
 menu_useraccount() {
-    local _firstpass _secondpass _desc
+    local _firstpass _secondpass _desc _again
     local _groups _status _group _checklist
     local _preset
 
@@ -690,9 +698,9 @@ menu_useraccount() {
         if [ -z "${_firstpass}" ]; then
             _desc="Enter the password for login '$(get_option USERLOGIN)'"
         else
-            _desc="$_desc again"
+            _again=" again"
         fi
-        DIALOG --insecure --passwordbox "${_desc}" ${INPUTSIZE}
+        DIALOG --insecure --passwordbox "${_desc}${_again}" ${INPUTSIZE}
         if [ $? -eq 0 ]; then
             if [ -z "${_firstpass}" ]; then
                 _firstpass="$(cat $ANSWER)"
@@ -702,7 +710,7 @@ menu_useraccount() {
             if [ -n "${_firstpass}" -a -n "${_secondpass}" ]; then
                 if [ "${_firstpass}" != "${_secondpass}" ]; then
                     INFOBOX "Passwords do not match! Please enter again." 6 60
-                    unset _firstpass _secondpass
+                    unset _firstpass _secondpass _again
                     sleep 2 && clear && continue
                 fi
                 set_option USERPASSWORD "${_firstpass}"
@@ -830,7 +838,7 @@ configure_wifi() {
         DIALOG --msgbox "Invalid SSID." ${MSGBOXSIZE}
         return 1
     elif [ -z "$enc" -o "$enc" != "wep" -a "$enc" != "wpa" ]; then
-        DIALOG --msgbox "Invalid encryption type (possible values: wep or wpa)." ${MSXBOXSIZE}
+        DIALOG --msgbox "Invalid encryption type (possible values: wep or wpa)." ${MSGBOXSIZE}
         return 1
     elif [ -z "$pass" ]; then
         DIALOG --msgbox "Invalid AP password." ${MSGBOXSIZE}
@@ -910,13 +918,13 @@ configure_net_static() {
         DIALOG --msgbox "${BOLD}${RED}ERROR:${RESET} Failed to bring $dev interface." ${MSGBOXSIZE}
         return 1
     fi
-    echo "running: ip addr add $ip dev $dev"
+    echo "running: ip addr add $ip dev $dev" >$LOG
     ip addr add $ip dev $dev >$LOG 2>&1
     if [ $? -ne 0 ]; then
         DIALOG --msgbox "${BOLD}${RED}ERROR:${RESET} Failed to set ip to the $dev interface." ${MSGBOXSIZE}
         return 1
     fi
-    ip route add $gw dev $dev >$LOG 2>&1
+    ip route add default via $gw >$LOG 2>&1
     if [ $? -ne 0 ]; then
         DIALOG --msgbox "${BOLD}${RED}ERROR:${RESET} failed to setup your gateway." ${MSGBOXSIZE}
         return 1
@@ -952,6 +960,7 @@ menu_network() {
 validate_filesystems() {
     local mnts dev size fstype mntpt mkfs rootfound fmt
     local usrfound efi_system_partition
+    local bootdev=$(get_option BOOTLOADER)
 
     unset TARGETFS
     mnts=$(grep -E '^MOUNTPOINT.*' $CONF_FILE)
@@ -985,10 +994,11 @@ the mount point for the root filesystem (/) has not yet been configured." ${MSGB
         DIALOG --msgbox "${BOLD}${RED}ERROR:${RESET} \
 /usr mount point has been configured but is not supported, please remove it to continue." ${MSGBOXSIZE}
         return 1
-    elif [ -n "$EFI_SYSTEM" -a -z "$efi_system_partition" ]; then
+    elif [ -n "$EFI_SYSTEM" -a "$bootdev" != "none" -a -z "$efi_system_partition" ]; then
         DIALOG --msgbox "${BOLD}${RED}ERROR:${RESET} \
 The EFI System Partition has not yet been configured, please create it\n
 as FAT32, mountpoint /boot/efi and at least with 100MB of size." ${MSGBOXSIZE}
+        return 1
     fi
     FILESYSTEMS_DONE=1
 }
@@ -1031,7 +1041,7 @@ failed to activate swap on $dev!\ncheck $LOG for errors." ${MSGBOXSIZE}
             ext2) MKFS="mke2fs -F"; modprobe ext2 >$LOG 2>&1;;
             ext3) MKFS="mke2fs -F -j"; modprobe ext3 >$LOG 2>&1;;
             ext4) MKFS="mke2fs -F -t ext4"; modprobe ext4 >$LOG 2>&1;;
-            f2fs) MKFS="mkfs.f2fs"; modprobe f2fs >$LOG 2>&1;;
+            f2fs) MKFS="mkfs.f2fs -f"; modprobe f2fs >$LOG 2>&1;;
             vfat) MKFS="mkfs.vfat -F32"; modprobe vfat >$LOG 2>&1;;
             xfs) MKFS="mkfs.xfs -f -i sparse=0"; modprobe xfs >$LOG 2>&1;;
             esac
@@ -1090,7 +1100,7 @@ mount_filesystems() {
     for f in sys proc dev; do
         [ ! -d $TARGETDIR/$f ] && mkdir $TARGETDIR/$f
         echo "Mounting $TARGETDIR/$f..." >$LOG
-        mount --bind /$f $TARGETDIR/$f >$LOG 2>&1
+        mount --rbind /$f $TARGETDIR/$f >$LOG 2>&1
     done
 }
 
@@ -1191,23 +1201,26 @@ enable_dhcpd() {
 }
 
 menu_install() {
-    # Don't continue if filesystems are not ready.
-    validate_filesystems || return 1
-
     ROOTPASSWORD_DONE="$(get_option ROOTPASSWORD)"
     BOOTLOADER_DONE="$(get_option BOOTLOADER)"
 
-    if [ -z "$FILESYSTEMS_DONE" ]; then
-        DIALOG --msgbox "${BOLD}Required filesystems were not configured, \
-please do so before starting the installation.${RESET}" ${MSGBOXSIZE}
-        return 1
-    elif [ -z "$ROOTPASSWORD_DONE" ]; then
+    if [ -z "$ROOTPASSWORD_DONE" ]; then
         DIALOG --msgbox "${BOLD}The root password has not been configured, \
 please do so before starting the installation.${RESET}" ${MSGBOXSIZE}
         return 1
     elif [ -z "$BOOTLOADER_DONE" ]; then
         DIALOG --msgbox "${BOLD}The disk to install the bootloader has not been \
 configured, please do so before starting the installation.${RESET}" ${MSGBOXSIZE}
+        return 1
+    fi
+
+    # Validate filesystems after making sure bootloader is done,
+    # so that specific checks can be made based on the selection
+    validate_filesystems || return 1
+
+    if [ -z "$FILESYSTEMS_DONE" ]; then
+        DIALOG --msgbox "${BOLD}Required filesystems were not configured, \
+please do so before starting the installation.${RESET}" ${MSGBOXSIZE}
         return 1
     fi
 
@@ -1312,6 +1325,9 @@ ${BOLD}Do you want to continue?${RESET}" 20 80 || return
         unset USERLOGIN
     fi
 
+    # clean up polkit rule - it's only useful in live systems
+    rm -f $TARGETDIR/etc/polkit-1/rules.d/void-live.rules
+
     # enable text console for grub if chosen
     if [ "$(get_option TEXTCONSOLE)" = "1" ]; then
         sed -i $TARGETDIR/etc/default/grub \
@@ -1342,7 +1358,7 @@ menu_source() {
     DIALOG --title " Select installation source " \
         --menu "$MENULABEL" 8 70 0 \
         "Local" "Packages from ISO image" \
-        "Network" "Base system only, downloaded from official reposity"
+        "Network" "Base system only, downloaded from official repository"
     case "$(cat $ANSWER)" in
         "Local") src="local";;
         "Network") src="net";
@@ -1356,11 +1372,13 @@ menu_source() {
 }
 
 menu() {
+    local AFTER_HOSTNAME
     if [ -z "$DEFITEM" ]; then
         DEFITEM="Keyboard"
     fi
 
     if xbps-uhelper arch | grep -qe '-musl$'; then
+        AFTER_HOSTNAME="Timezone"
         DIALOG --default-item $DEFITEM \
             --extra-button --extra-label "Settings" \
             --title " Void Linux installation menu " \
@@ -1378,6 +1396,7 @@ menu() {
             "Install" "Start installation with saved settings" \
             "Exit" "Exit installation"
     else
+        AFTER_HOSTNAME="Locale"
         DIALOG --default-item $DEFITEM \
             --extra-button --extra-label "Settings" \
             --title " Void Linux installation menu " \
@@ -1410,7 +1429,7 @@ menu() {
         "Keyboard") menu_keymap && [ -n "$KEYBOARD_DONE" ] && DEFITEM="Network";;
         "Network") menu_network && [ -n "$NETWORK_DONE" ] && DEFITEM="Source";;
         "Source") menu_source && [ -n "$SOURCE_DONE" ] && DEFITEM="Hostname";;
-        "Hostname") menu_hostname && [ -n "$HOSTNAME_DONE" ] && DEFITEM="Locale";;
+        "Hostname") menu_hostname && [ -n "$HOSTNAME_DONE" ] && DEFITEM="$AFTER_HOSTNAME";;
         "Locale") menu_locale && [ -n "$LOCALE_DONE" ] && DEFITEM="Timezone";;
         "Timezone") menu_timezone && [ -n "$TIMEZONE_DONE" ] && DEFITEM="RootPassword";;
         "RootPassword") menu_rootpassword && [ -n "$ROOTPASSWORD_DONE" ] && DEFITEM="UserAccount";;
@@ -1443,7 +1462,7 @@ Welcome to the Void Linux installation. A simple and minimal \
 Linux distribution made from scratch and built from the source package tree \
 available for XBPS, a new alternative binary package system.\n\n
 The installation should be pretty straightforward. If you are in trouble \
-please join us at ${BOLD}#voidlinux${RESET} on ${BOLD}irc.freenode.org${RESET}.\n\n
+please join us at ${BOLD}#voidlinux${RESET} on ${BOLD}irc.libera.chat${RESET}.\n\n
 ${BOLD}https://www.voidlinux.org${RESET}\n\n" 16 80
 
 while true; do

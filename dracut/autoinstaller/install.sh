@@ -22,12 +22,12 @@ VAI_welcome() {
 }
 
 VAI_get_address() {
-    # Enable the hook for resolv.conf
-    mkdir -p /usr/lib/dhcpcd/dhcpcd-hooks
-    ln -sf /usr/libexec/dhcpcd-hooks/20-resolv.conf /usr/lib/dhcpcd/dhcpcd-hooks/
+    mkdir -p /var/lib/dhclient
 
-    # Get an IP address
-    dhcpcd -w -L --timeout 0
+    # This will fork, but it means that over a slow link the DHCP
+    # lease will still be maintained.  It also doesn't have a
+    # hard-coded privsep user in it like dhcpcd.
+    dhclient
 }
 
 VAI_partition_disk() {
@@ -74,8 +74,8 @@ VAI_install_base_system() {
 VAI_prepare_chroot() {
     # Mount dev, bind, proc, etc into chroot
     mount -t proc proc "${target}/proc"
-    mount -t sysfs sys "${target}/sys"
-    mount -o rbind /dev "${target}/dev"
+    mount --rbind /sys "${target}/sys"
+    mount --rbind /dev "${target}/dev"
 }
 
 VAI_configure_sudo() {
@@ -189,6 +189,7 @@ VAI_configure_autoinstall() {
     bootpartitionsize="500M"
     disk="$(lsblk -ipo NAME,TYPE,MOUNTPOINT | awk '{if ($2=="disk") {disks[$1]=0; last=$1} if ($3=="/") {disks[last]++}} END {for (a in disks) {if(disks[a] == 0){print a; break}}}')"
     hostname="$(ip -4 -o -r a | awk -F'[ ./]' '{x=$7} END {print x}')"
+    # XXX: Set a manual swapsize here if the default doesn't fit your use case
     swapsize="$(awk -F"\n" '/MemTotal/ {split($0, b, " "); print b[2] }' /proc/meminfo)";
     target="/mnt"
     timezone="America/Chicago"
